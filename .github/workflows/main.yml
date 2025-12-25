@@ -1,0 +1,77 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Kodları Çek
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. JAVA 17 KUR
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 3. Python Kur
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # 4. TEMİZ KURULUM VE KLASÖRLEME
+      # Proje isminde tire (-) sorunu olmasın diye kodları özel bir klasöre alıyoruz.
+      - name: Setup Project Directory
+        run: |
+          echo "Proje klasörü hazırlanıyor..."
+          mkdir kpss_final_v1
+          
+          # Dosyaları yeni klasöre taşı (main.py, jsonlar, assets)
+          find . -maxdepth 1 -name "main.py" -exec mv {} kpss_final_v1/ \;
+          find . -maxdepth 1 -name "*.json" -exec mv {} kpss_final_v1/ \;
+          if [ -f "requirements.txt" ]; then mv requirements.txt kpss_final_v1/; fi
+          if [ -d "assets" ]; then mv assets kpss_final_v1/; fi
+          
+          echo "Dosyalar taşındı. Klasör içeriği:"
+          ls -R kpss_final_v1
+
+      # 5. Gerekli Araçları Yükle
+      - name: Install Build Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install cookiecutter
+          pip install packaging
+          pip install flet
+
+      # 6. Flutter Ortamını Hazırla
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+
+      # 7. Android Lisanslarını Kabul Et
+      - name: Accept Android Licenses
+        run: |
+          yes | flutter doctor --android-licenses
+
+      # 8. APK Derleme (OTOMATİK ONAYLI)
+      - name: Build APK
+        run: |
+          cd kpss_final_v1
+          yes | flet build apk --verbose
+
+      # 9. Sonucu Yükle
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kpss-final-apk
+          path: kpss_final_v1/build/apk/app-release.apk
